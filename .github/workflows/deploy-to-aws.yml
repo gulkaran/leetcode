@@ -1,0 +1,53 @@
+name: Deploy and Update DynamoDB
+
+on:
+  push:
+    paths:
+      - '**.md' # Trigger only for .md files
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Upload .md file to S3
+        run: |
+          FILENAME=$(basename ${{ github.event.head_commit.modified[0] }})
+          FOLDERNAME=$(basename $(dirname ${{ github.event.head_commit.modified[0] }}))
+          S3_LINK="https://gulkaran-portfolio.s3.amazonaws.com/leetcode/$FILENAME"
+          aws s3 cp ${{ github.event.head_commit.modified[0] }} s3://gulkaran-portfolio/leetcode/$FILENAME
+
+      - name: Update DynamoDB Table
+        run: |
+          FILENAME=$(basename ${{ github.event.head_commit.modified[0] }} .md)
+          FOLDERNAME=$(basename $(dirname ${{ github.event.head_commit.modified[0] }}))
+          DIFFICULTY=$(basename $(dirname $(dirname ${{ github.event.head_commit.modified[0] }})))
+          NAME=$(echo "$FILENAME" | sed -r 's/(^|-)([a-z])/\U\2/g')
+          DATE_CREATED=$(date '+%Y-%m-%d')
+
+          # Add new item to DynamoDB
+          aws dynamodb put-item \
+              --table-name Leetcode \
+              --item '{
+                  "pattern": {"S": "'$FOLDERNAME'"},
+                  "id": {"S": "'$FILENAME'.md"},
+                  "date_created": {"S": "'$DATE_CREATED'"},
+                  "date_updated": {"S": ""},
+                  "difficulty": {"S": "'$DIFFICULTY'"},
+                  "link_lc": {"S": "https://leetcode.com/problems/'$FILENAME'"},
+                  "link_s3": {"S": "'$S3_LINK'"},
+                  "name": {"S": "'$NAME'"}
+              }'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
