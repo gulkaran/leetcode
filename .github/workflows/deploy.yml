@@ -1,0 +1,86 @@
+name: Upload New Markdown Files
+
+on:
+  push:
+    branches:
+      - main  # or your default branch name
+
+jobs:
+  upload-new-files:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 2  # To be able to get the changed files
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install boto3
+
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v23
+      with:
+        files: '**/*.md'
+
+    - name: Process new files
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: 'us-east-1'  # Replace with your preferred region
+      run: |
+        import boto3
+        import os
+        from datetime import datetime
+
+        s3 = boto3.client('s3')
+        dynamodb = boto3.resource('dynamodb')
+        table = dynamodb.Table('Leetcode')  # Replace with your table name
+
+        bucket_name = 'gulkaran-portfolio'  # Replace with your bucket name
+
+        changed_files = '${{ steps.changed-files.outputs.all_changed_files }}'.split()
+        
+        def title_case(s):
+            return ' '.join(word.capitalize() for word in s.split('-'))
+
+        for file_path in changed_files:
+            if file_path.endswith('.md'):
+                # Extract information from file path
+                path_parts = file_path.split('/')
+                pattern = path_parts[-3]
+                difficulty = path_parts[-2]
+                filename = os.path.basename(file_path)
+                file_id = os.path.splitext(filename)[0]
+
+                # Upload file to S3
+                with open(file_path, 'rb') as file:
+                    s3_key = f"{pattern}/{difficulty}/{filename}"
+                    s3.upload_fileobj(file, bucket_name, s3_key)
+                
+                s3_link = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
+
+                # Create entry in DynamoDB
+                table.put_item(
+                    Item={
+                        'pattern': pattern,
+                        'id': file_id,
+                        'date_created': datetime.now().strftime('%Y-%m-%d'),
+                        'date_updated': '',
+                        'difficulty': difficulty,
+                        'link_lc': {'S': f"https://leetcode.com/problems/{file_id}"},
+                        'link_s3': {'S': s3_link},
+                        'name': title_case(file_id)
+                    }
+                )
+                
+                print(f"Processed file: {file_path}")
+      shell: python
