@@ -63,7 +63,7 @@ jobs:
 
                 # Upload file to S3
                 with open(file_path, 'rb') as file:
-                    s3_key = f"{pattern}/{difficulty}/{filename}"
+                    s3_key = f"leetcode/{filename}"
                     s3.upload_fileobj(file, bucket_name, s3_key)
                 
                 s3_link = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
@@ -76,8 +76,8 @@ jobs:
                         'date_created': datetime.now().strftime('%Y-%m-%d'),
                         'date_updated': '',
                         'difficulty': difficulty,
-                        'link_lc': {'S': f"https://leetcode.com/problems/{file_id}"},
-                        'link_s3': {'S': s3_link},
+                        'link_lc': f"https://leetcode.com/problems/{file_id}"",
+                        'link_s3': s3_link,
                         'name': title_case(file_id)
                     }
                 )
