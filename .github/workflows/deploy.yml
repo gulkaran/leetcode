@@ -76,7 +76,7 @@ jobs:
                         'date_created': datetime.now().strftime('%Y-%m-%d'),
                         'date_updated': '',
                         'difficulty': difficulty,
-                        'link_lc': f"https://leetcode.com/problems/{file_id}"",
+                        'link_lc': f"https://leetcode.com/problems/{file_id}",
                         'link_s3': s3_link,
                         'name': title_case(file_id)
                     }
