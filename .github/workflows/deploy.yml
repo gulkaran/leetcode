@@ -3,84 +3,104 @@ name: Upload New Markdown Files
 on:
   push:
     branches:
-      - main  # or your default branch name
+      - main # or your default branch name
 
 jobs:
   upload-new-files:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-      with:
-        fetch-depth: 2  # To be able to get the changed files
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2 # To be able to get the changed files
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install boto3
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3
 
-    - name: Get changed files
-      id: changed-files
-      uses: tj-actions/changed-files@v23
-      with:
-        files: '**/*.md'
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v23
+        with:
+          files: '**/*.md'
 
-    - name: Process new files
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: 'us-east-1'  # Replace with your preferred region
-      run: |
-        import boto3
-        import os
-        from datetime import datetime
+      - name: Process new files
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: 'us-east-1' # Replace with your preferred region
+        run: |
+          import boto3
+          import os
+          from datetime import datetime
 
-        s3 = boto3.client('s3')
-        dynamodb = boto3.resource('dynamodb')
-        table = dynamodb.Table('Leetcode')  # Replace with your table name
+          s3 = boto3.client('s3')
+          dynamodb = boto3.resource('dynamodb')
+          table = dynamodb.Table('Leetcode')  # Replace with your table name
 
-        bucket_name = 'gulkaran-portfolio'  # Replace with your bucket name
+          bucket_name = 'gulkaran-portfolio'  # Replace with your bucket name
 
-        changed_files = '${{ steps.changed-files.outputs.all_changed_files }}'.split()
-        
-        def title_case(s):
-            return ' '.join(word.capitalize() for word in s.split('-'))
+          changed_files = '${{ steps.changed-files.outputs.all_changed_files }}'.split()
 
-        for file_path in changed_files:
-            if file_path.endswith('.md'):
-                # Extract information from file path
-                path_parts = file_path.split('/')
-                pattern = path_parts[-3]
-                difficulty = path_parts[-2]
-                filename = os.path.basename(file_path)
-                file_id = os.path.splitext(filename)[0]
+          def title_case(s):
+              return ' '.join(word.capitalize() for word in s.split('-'))
 
-                # Upload file to S3
-                with open(file_path, 'rb') as file:
-                    s3_key = f"leetcode/{filename}"
-                    s3.upload_fileobj(file, bucket_name, s3_key)
-                
-                s3_link = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
+          def modify_md_file(file_path):
+              with open(file_path, 'r') as file:
+                  lines = file.readlines()
+              
+              # Remove the third line if it exists
+              if len(lines) >= 3:
+                  del lines[2]
+              
+              # Add the HTML to the first line
+              html_to_add = '<img align="right" height="50" src="https://upload.wikimedia.org/wikipedia/commons/8/8e/LeetCode_Logo_1.png"/>\n'
+              lines[0] = lines[0] + html_to_add
+              
+              # Write the modified content back to the file
+              with open(file_path, 'w') as file:
+                  file.writelines(lines)
 
-                # Create entry in DynamoDB
-                table.put_item(
-                    Item={
-                        'pattern': pattern,
-                        'id': file_id,
-                        'date_created': datetime.now().strftime('%Y-%m-%d'),
-                        'date_updated': '',
-                        'difficulty': difficulty,
-                        'link_lc': f"https://leetcode.com/problems/{file_id}",
-                        'link_s3': s3_link,
-                        'name': title_case(file_id)
-                    }
-                )
-                
-                print(f"Processed file: {file_path}")
-      shell: python
+          for file_path in changed_files:
+              if file_path.endswith('.md'):
+
+                  # Modify the file
+                  modify_md_file(file_path)
+
+                  # Extract information from file path
+                  path_parts = file_path.split('/')
+                  pattern = path_parts[-3]
+                  difficulty = path_parts[-2]
+                  filename = os.path.basename(file_path)
+                  file_id = os.path.splitext(filename)[0]
+
+                  # Upload file to S3
+                  with open(file_path, 'rb') as file:
+                      s3_key = f"leetcode/{filename}"
+                      s3.upload_fileobj(file, bucket_name, s3_key)
+                  
+                  s3_link = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
+
+                  # Create entry in DynamoDB
+                  table.put_item(
+                      Item={
+                          'pattern': pattern,
+                          'id': file_id,
+                          'date_created': datetime.now().strftime('%Y-%m-%d'),
+                          'date_updated': '',
+                          'difficulty': difficulty,
+                          'link_lc': f"https://leetcode.com/problems/{file_id}",
+                          'link_s3': s3_link,
+                          'name': title_case(file_id)
+                      }
+                  )
+                  
+                  print(f"Processed file: {file_path}")
+        shell: python
