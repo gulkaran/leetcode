@@ -39,6 +39,7 @@ jobs:
         run: |
           import boto3
           import os
+          import re
           from datetime import datetime
 
           s3 = boto3.client('s3')
@@ -54,19 +55,30 @@ jobs:
 
           def modify_md_file(file_path):
               with open(file_path, 'r') as file:
-                  lines = file.readlines()
+                  content = file.read()
               
-              # Remove the third line if it exists
-              if len(lines) >= 3:
+              # HTML to add
+              html_to_add = ' <img align="right" height="50" src="https://upload.wikimedia.org/wikipedia/commons/8/8e/LeetCode_Logo_1.png"/>'
+              
+              # Find the title line and add HTML after it
+              lines = content.split('\n')
+              title_pattern = re.compile(r'^#\s+.*$')
+              
+              for i, line in enumerate(lines):
+                  if title_pattern.match(line):
+                      lines[i] = line + html_to_add
+                      break
+              
+              # Remove the third line if it exists and is not the title
+              if len(lines) >= 3 and not title_pattern.match(lines[2]):
                   del lines[2]
               
-              # Add the HTML to the first line
-              html_to_add = '<img align="right" height="50" src="https://upload.wikimedia.org/wikipedia/commons/8/8e/LeetCode_Logo_1.png"/>\n'
-              lines[0] = lines[0] + html_to_add
+              # Join the lines back together
+              modified_content = '\n'.join(lines)
               
               # Write the modified content back to the file
               with open(file_path, 'w') as file:
-                  file.writelines(lines)
+                  file.write(modified_content)
 
           for file_path in changed_files:
               if file_path.endswith('.md'):
