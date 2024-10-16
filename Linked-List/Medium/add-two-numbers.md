@@ -2,7 +2,7 @@
 
 [https://leetcode.com/problems/add-two-numbers/](https://leetcode.com/problems/add-two-numbers/)
 
-Keep track of the carry and the edge case with carry == 1 after the algorithm is done. Other than that, its a simple LL problem.
+Keep track of the carry and the edge case with carry == 1 after the algorithm is done. Other than that, its a simple linked list problem.
 
 ```python
 class Solution:
@@ -27,7 +27,7 @@ class Solution:
             curr = curr.next
             l1 = l1.next if l1 else None
             l2 = l2.next if l2 else None
-        
+
         # edge case, e.g. 8 + 7 = 5 with carry 1, need to add extra 1 node, 5 -> 1
         if carry == 1:
             curr.next = ListNode(1)
